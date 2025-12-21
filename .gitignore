@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.venv
+venv/
+env/
+
+# Data
+# 설문조사 DB/ (If the DB is private, uncomment this)
+
+# Local Config
+.streamlit/config.toml
+.vscode/
+*.bat
