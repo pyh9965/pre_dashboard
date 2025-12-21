@@ -32,8 +32,16 @@ if uploaded_file:
     df = load_data(uploaded_file)
     st.sidebar.success("업로드된 파일을 사용합니다.")
 else:
-    # Default Path
-    default_path = r'd:/AI프로그램제작/사전영업대시보드/설문조사 DB/DEFINE_DB.xlsx'
+    # Use relative path for Cross-platform / Cloud compatibility
+    import os
+    # Filename in GitHub is 'DB.xlsx' inside '설문조사 DB' folder
+    base_dir = os.path.dirname(__file__)
+    default_path = os.path.join(base_dir, '설문조사 DB', 'DB.xlsx')
+    
+    # Try alternate if not found (for local backwards compatibility)
+    if not os.path.exists(default_path):
+        default_path = os.path.join(base_dir, '설문조사 DB', 'DEFINE_DB.xlsx')
+        
     df = load_data(default_path)
 
 if df is not None:
