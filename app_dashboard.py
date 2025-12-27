@@ -172,6 +172,49 @@ if df is not None:
     c4.metric("잠재 전환율", f"{conversion:.1f} %", sa_delta)
     
     st.markdown("---")
+
+    # --- Helper: Weekly Period Calculator (Mon-Sun) ---
+    def get_weekly_period(date_series):
+        """
+        Groups dates into weekly buckets (Monday-Sunday).
+        Returns a Series of strings: "1주차 (12/08~12/14)"
+        """
+        if date_series.empty:
+            return date_series.astype(str)
+
+        # 1. Find the global minimum date to determine Week 1's anchor
+        # Ensure we anchor to the Monday of the week containing the min date
+        min_date = date_series.min()
+        # weekday(): Mon=0, Sun=6. 
+        # Subtract current weekday to get Monday.
+        start_anchor = min_date - pd.Timedelta(days=min_date.weekday())
+        
+        # 2. Calculate offset in weeks
+        # We need to apply the logic row by row or vectorized
+        # Vectorized: (date - anchor).dt.days // 7 + 1
+        # Only works if date_series is datetime64
+        
+        dates = pd.to_datetime(date_series)
+        days_diff = (dates - start_anchor).dt.days
+        week_nums = (days_diff // 7) + 1
+        
+        # 3. Calculate Start/End date for each week num
+        # Week N Start = Anchor + (N-1)*7
+        # Week N End   = Week N Start + 6
+        
+        results = []
+        for d, w in zip(dates, week_nums):
+            if pd.isna(d):
+                results.append("미확인")
+                continue
+                
+            w_start = start_anchor + pd.Timedelta(days=(w-1)*7)
+            w_end = w_start + pd.Timedelta(days=6)
+            
+            period_str = f"{w_start.strftime('%m/%d')}~{w_end.strftime('%m/%d')}"
+            results.append(f"{w}주차 ({period_str})")
+            
+        return pd.Series(results, index=date_series.index)
     
     # --- Reusable Analysis Function ---
     def draw_analysis_tabs(target_df, key_suffix=""):
@@ -180,7 +223,7 @@ if df is not None:
             return
 
         # Sub-tabs within the analysis view
-        t1, t2, t3, t4 = st.tabs(["📊 설문 문항 통합 분석", "🌍 인구/지역 통계", "🏆 상담 등급 분석", "📈 영업 성과 분석"])
+        t1, t2, t3, t4, t5 = st.tabs(["📊 설문 문항 통합 분석", "🌍 인구/지역 통계", "🏆 상담 등급 분석", "📈 영업 성과 분석", "📅 주차별 추이"])
         
         # Tab 1: Combined Survey (Q1~Q8)
         with t1:
@@ -404,6 +447,112 @@ if df is not None:
                         'S_Ratio': 'S급 비율(%)'
                     }
                     st.dataframe(mgr_stats.rename(columns=mgr_header_map), use_container_width=True)
+
+        # Tab 5: Weekly Trend Analysis
+        with t5:
+            st.markdown("#### 📅 주차별 설문 응답 추이 (Weekly Trend)")
+            if 'Date' not in target_df.columns:
+                st.warning("날짜(Date) 데이터가 없어 주차별 분석을 할 수 없습니다.")
+            else:
+                # 1. Calculate Weeks
+                # Make a copy to avoid SettingWithCopy warnings on the original df slice
+                analysis_df = target_df.copy()
+                analysis_df['Week_Label'] = get_weekly_period(pd.to_datetime(analysis_df['Date']))
+                
+                # 2. Select Question
+                q_options = {
+                    'Q1_Label': 'Q1. 사업지 인지도',
+                    'Q2_Label': 'Q2. 정보 습득 경로',
+                    'Q3_Label': 'Q3. 만족 장점',
+                    'Q4_Label': 'Q4. 구매 목적',
+                    'Q5_Label': 'Q5. 선호 평형',
+                    'Q6_Intent': 'Q6. 계약 의향 (점수)',
+                    'Q7_Label': 'Q7. 청약 예정',
+                    'Q8_Label': 'Q8. 희망 분양가'
+                }
+                
+                # Filter out columns that don't exist
+                valid_q_options = {k: v for k, v in q_options.items() if k in analysis_df.columns}
+                
+                if not valid_q_options:
+                     st.error("분석할 설문 문항 데이터가 없습니다.")
+                else:
+                    # Visualization Options
+                    view_type = st.radio("그래프 보기 방식", ["건수 (Count)", "비율 (Percentage)"], horizontal=True, key=f"wk_view_{key_suffix}")
+                    st.markdown("---")
+
+                    # Loop through all questions
+                    # We will use a 2-column layout
+                    cols = st.columns(2)
+                    
+                    for idx, (q_key, q_title) in enumerate(valid_q_options.items()):
+                        # Determine which column to use (0 or 1)
+                        col_idx = idx % 2
+                        with cols[col_idx]:
+                            st.markdown(f"##### {q_title}")
+                            
+                            # Special handling for Q6 (Score)
+                            if q_key == 'Q6_Intent':
+                                # For Q6, we show the Average Score Trend Line
+                                weekly_avg = analysis_df.groupby('Week_Label')['Q6_Intent'].mean().reset_index()
+                                weekly_avg.columns = ['Week', 'Avg_Score']
+                                # Sort naturally if possible, else by Week Label
+                                try:
+                                    weekly_avg['Week_Num'] = weekly_avg['Week'].apply(lambda x: int(x.split('주차')[0]))
+                                    weekly_avg = weekly_avg.sort_values('Week_Num')
+                                except:
+                                    weekly_avg = weekly_avg.sort_values('Week')
+
+                                fig = px.line(weekly_avg, x='Week', y='Avg_Score', markers=True, title="주차별 평균 계약 의향 점수", text='Avg_Score')
+                                fig.update_traces(textposition="bottom center", texttemplate='%{text:.2f}')
+                                fig.update_yaxes(range=[0, 8])
+                                st.plotly_chart(fig, use_container_width=True, key=f"wk_line_{idx}_{key_suffix}")
+                                
+                                # Optional: Also show distribution below? 
+                                # Might be too crowded. Let's stick to Average Line for Q6 in this grid view
+                                # OR show distribution instead if user prefers. 
+                                # Let's show the Score Distribution Bar Chart as well.
+                                counts = analysis_df.groupby(['Week_Label', 'Q6_Intent']).size().reset_index(name='Count')
+                                # Sort logic same as below...
+                                try:
+                                    counts['Week_Num'] = counts['Week_Label'].apply(lambda x: int(x.split('주차')[0]))
+                                    counts = counts.sort_values(['Week_Num', 'Q6_Intent'])
+                                except:
+                                    counts = counts.sort_values(['Week_Label', 'Q6_Intent'])
+                                    
+                                if "비율" in view_type:
+                                     week_totals = counts.groupby('Week_Label')['Count'].transform('sum')
+                                     counts['Percent'] = (counts['Count'] / week_totals * 100).round(1)
+                                     fig2 = px.bar(counts, x='Week_Label', y='Percent', color='Q6_Intent', text='Percent', title="의향 점수 분포")
+                                     fig2.update_traces(texttemplate='%{text}%', textposition='inside')
+                                else:
+                                     fig2 = px.bar(counts, x='Week_Label', y='Count', color='Q6_Intent', text='Count', title="의향 점수 분포")
+                                     fig2.update_traces(textposition='inside')
+                                st.plotly_chart(fig2, use_container_width=True, key=f"wk_bar_{idx}_{key_suffix}")
+
+                            else:
+                                # Categorical Questions
+                                counts = analysis_df.groupby(['Week_Label', q_key]).size().reset_index(name='Count')
+                                
+                                # Sort Lines
+                                try:
+                                    counts['Week_Num'] = counts['Week_Label'].apply(lambda x: int(x.split('주차')[0]))
+                                    counts = counts.sort_values(['Week_Num', 'Count'], ascending=[True, False])
+                                except:
+                                    counts = counts.sort_values('Week_Label')
+
+                                if "비율" in view_type:
+                                    week_totals = counts.groupby('Week_Label')['Count'].transform('sum')
+                                    counts['Percent'] = (counts['Count'] / week_totals * 100).round(1)
+                                    fig = px.bar(counts, x='Week_Label', y='Percent', color=q_key, text='Percent')
+                                    fig.update_traces(texttemplate='%{text}%', textposition='inside')
+                                else:
+                                    fig = px.bar(counts, x='Week_Label', y='Count', color=q_key, text='Count')
+                                    fig.update_traces(textposition='inside')
+                                    
+                                st.plotly_chart(fig, use_container_width=True, key=f"wk_chart_{idx}_{key_suffix}")
+                            
+                            st.markdown("---")
 
 
     # --- Top Tabs ---
