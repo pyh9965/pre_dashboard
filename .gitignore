@@ -13,5 +13,6 @@ env/
 
 # Local Config
 .streamlit/config.toml
+.streamlit/secrets.toml
 .vscode/
 *.bat
