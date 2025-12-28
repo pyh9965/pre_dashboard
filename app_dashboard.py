@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+from datetime import datetime
+from excel_report_generator import generate_excel_report
+from ai_analyzer import generate_ai_insight
 
 # Page Config
 st.set_page_config(page_title="사전영업 대시보드", page_icon="📊", layout="wide")
@@ -68,7 +71,7 @@ if df is not None:
     }
     
     df.rename(columns=col_map, inplace=True)
-    
+
     # --- Data Cleaning & Mapping ---
     # Ensure Numeric
     for c in ['Q6_Intent', 'Q4_Purpose', 'Q5_Type', 'Q1_Awareness', 'Q2_Channel', 'Q7_Subscription', 'Q8_Price', 'Gender']:
@@ -144,6 +147,49 @@ if df is not None:
         sel_gu = st.sidebar.multiselect("🏠 거주지 (시/군/구)", gus)
         if sel_gu:
             df = df[df['Addr_Gu'].isin(sel_gu)]
+    
+    # --- Excel Report Download Section ---
+    st.sidebar.markdown("---")
+    st.sidebar.header("📥 보고서 내보내기")
+    
+    report_type_options = {
+        "📊 전체 보고서 (데이터 + 요약 + 차트)": "전체",
+        "📋 데이터만 (원본 + 통계 요약)": "데이터만",
+    }
+    
+    selected_report = st.sidebar.selectbox(
+        "보고서 유형 선택",
+        list(report_type_options.keys())
+    )
+    
+    if st.sidebar.button("📥 엑셀 보고서 생성", type="primary", use_container_width=True):
+        with st.sidebar:
+            with st.spinner('보고서 생성 중...'):
+                try:
+                    # 현재 필터링된 데이터로 보고서 생성
+                    report_type = report_type_options[selected_report]
+                    excel_file = generate_excel_report(df, report_type)
+                    
+                    # 세션 상태에 저장 (BytesIO 대신 bytes 바이트 문자열로 저장)
+                    st.session_state['generated_excel'] = excel_file.getvalue()
+                    st.session_state['generated_filename'] = f"PreSales_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+                    st.session_state['last_filter_hash'] = hash(str(df.index.tolist())) # 데이터 변경 감지용 (단순화)
+                    
+                    st.success("✅ 생성 완료! 아래 버튼을 눌러 다운로드하세요.")
+                except Exception as e:
+                    st.error(f"⚠️ 오류 발생: {str(e)}")
+                    st.info("데이터만 옵션을 시도해보세요.")
+
+    # 생성된 파일이 있으면 다운로드 버튼 표시
+    if 'generated_excel' in st.session_state and st.session_state['generated_excel'] is not None:
+        st.sidebar.download_button(
+            label="⬇️ 엑셀 파일 다운로드",
+            data=st.session_state['generated_excel'],
+            file_name=st.session_state['generated_filename'],
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"dl_{st.session_state['generated_filename']}",
+            use_container_width=True
+        )
 
     # --- Metrics ---
     st.header("1. 핵심 현황 (Key Metrics)")
@@ -556,7 +602,7 @@ if df is not None:
 
 
     # --- Top Tabs ---
-    main_tabs = st.tabs(["📊 전체 분석", "🟢 서대문구", "🔵 마포구", "🟣 은평구"])
+    main_tabs = st.tabs(["📊 전체 분석", "🟢 서대문구", "🔵 마포구", "🟣 은평구", "📈 고급 분석", "🤖 AI 분석"])
     
     # 1. Main Analysis
     with main_tabs[0]:
@@ -590,6 +636,233 @@ if df is not None:
         target = filtered_base_df[filtered_base_df['Addr_Gu'] == '은평구']
         st.info(f"선택 기간 내 은평구 거주 응답 수: {len(target):,} 명")
         draw_analysis_tabs(target, "eun")
+
+    # 5. Advanced Analytics Dashboard (Moved to Tab)
+    with main_tabs[4]:
+        st.header("📈 고급 분석 대시보드")
+        st.caption("리드 스코어링, RFIE 세그먼트, 경고 시스템을 통한 심층 분석")
+    
+    # Import advanced analytics
+    try:
+        from advanced_analytics import (
+            apply_lead_scoring,
+            get_lead_score_summary,
+            calculate_rfie_scores,
+            get_rfie_summary,
+            get_segment_summary,
+            generate_alerts
+        )
+        
+        # Apply lead scoring
+        df_scored = apply_lead_scoring(df)
+        lead_summary = get_lead_score_summary(df_scored)
+        
+        # Apply RFIE
+        df_rfie = calculate_rfie_scores(df)
+        rfie_summary = get_rfie_summary(df_rfie)
+        
+        # Create tabs for advanced analytics
+        adv_tabs = st.tabs(["🎯 리드 스코어링", "📊 RFIE 세그먼트", "⚠️ 경고/알림"])
+        
+        # Tab 1: Lead Scoring
+        with adv_tabs[0]:
+            # 설명 박스 추가
+            with st.expander("ℹ️ 리드 스코어링이란?", expanded=False):
+                st.markdown("""
+                **리드 스코어링**은 각 고객의 **계약 가능성을 0~100점으로 수치화**한 것입니다.
+                
+                **📊 점수 산정 기준:**
+                | 항목 | 기준 | 최대 점수 |
+                |------|------|----------|
+                | 계약 의향 (Q6) | 7점 이상 → 30점, 5~6점 → 20점 | 30점 |
+                | 청약 자격 (Q7) | 1순위/2순위/특별공급 보유 시 | 25점 |
+                | 희망 분양가 (Q8) | 분양가 범위 내 | 20점 |
+                | 구매 목적 (Q4) | 실거주 → 15점, 투자 → 10점 | 15점 |
+                | 유입 경로 (Q2) | 지인 추천 → 15점, 온라인 → 8점 | 10점 |
+                
+                **🏷️ 등급 분류:**
+                - 🔴 **A급 (80점↑)**: 즉시 계약 가능! 바로 전화하세요
+                - 🟠 **B급 (60~79점)**: 관심 높음, 48시간 내 연락
+                - 🟡 **C급 (40~59점)**: 육성 필요, 주간 뉴스레터
+                - ⚪ **D급 (40점↓)**: 장기 관리, 월간 리마인드
+                """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("리드 등급 분포")
+                st.caption("고객들이 어떤 등급에 분포하는지 한눈에 파악")
+                grade_counts = df_scored['Lead_Grade'].value_counts()
+                fig_lead = px.pie(
+                    values=grade_counts.values,
+                    names=grade_counts.index,
+                    color_discrete_sequence=['#FF6B6B', '#FFA94D', '#FFD93D', '#C0C0C0'],
+                    hole=0.4
+                )
+                fig_lead.update_layout(height=350)
+                st.plotly_chart(fig_lead, use_container_width=True)
+            
+            with col2:
+                st.subheader("리드 스코어 통계")
+                st.caption("등급별 고객 수와 비율")
+                st.metric("평균 스코어", f"{lead_summary['평균_스코어']}점", help="전체 고객의 평균 리드 스코어")
+                st.metric("A급 고객", f"{lead_summary['A급_수']}명 ({lead_summary.get('A급_비율', '0%')})", help="즉시 계약 가능한 핵심 고객")
+                st.metric("B급 고객", f"{lead_summary['B급_수']}명 ({lead_summary.get('B급_비율', '0%')})", help="관심도 높은 잠재 고객")
+                st.metric("C급 고객", f"{lead_summary['C급_수']}명 ({lead_summary.get('C급_비율', '0%')})", help="육성이 필요한 고객")
+            
+            # Segment details
+            st.subheader("세그먼트별 특성")
+            st.caption("각 등급 고객들의 주요 특성 - 클릭하면 상세 정보 확인")
+            segment_details = get_segment_summary(df_scored)
+            for grade, info in segment_details.items():
+                with st.expander(f"{grade} - {info['고객_수']}명 ({info['비율']})"):
+                    cols = st.columns(3)
+                    cols[0].write(f"**선호 평형:** {info.get('선호_평형', 'N/A')}")
+                    cols[1].write(f"**주요 유입:** {info.get('주요_유입경로', 'N/A')}")
+                    cols[2].write(f"**주요 목적:** {info.get('주요_목적', 'N/A')}")
+        
+        # Tab 2: RFIE Segment
+        with adv_tabs[1]:
+            # 설명 박스 추가
+            with st.expander("ℹ️ RFIE 분석이란?", expanded=False):
+                st.markdown("""
+                **RFIE 분석**은 고객을 **4가지 관점**에서 평가하여 세그먼트로 분류하는 방법입니다.
+                
+                **📊 RFIE 구성 요소:**
+                | 지표 | 의미 | 점수 기준 |
+                |------|------|----------|
+                | **R** (Recency) | 최근 응답일 | 최근일수록 높음 (1~5점) |
+                | **F** (Frequency) | 접촉 빈도 | 현재 1회 고정 (3점) |
+                | **I** (Intent) | 계약 의향 | 의향 점수 기반 (1~5점) |
+                | **E** (Eligibility) | 청약 자격 | 보유 시 +2점 |
+                
+                **🏷️ 세그먼트 분류 (총점 기준):**
+                - 🏆 **Champion (15점↑)**: VIP 고객! 즉시 계약 가능
+                - ⭐ **Loyal (12~14점)**: 충성도 높음, 추가 설득 필요
+                - 🌱 **Promising (8~11점)**: 성장 가능성 있음, 육성 대상
+                - 💤 **At Risk (5~7점)**: 관심 저하, 재활성화 필요
+                - ❌ **Lost (5점↓)**: 이탈 위험, 장기 관리
+                
+                **💡 활용 팁:** Champion과 Loyal에 마케팅 자원을 집중하고, At Risk는 리마인드 메시지를 보내세요!
+                """)
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.subheader("RFIE 세그먼트 분포")
+                st.caption("각 세그먼트별 고객 수")
+                segment_counts = df_rfie['RFIE_Segment'].value_counts()
+                fig_rfie = px.bar(
+                    x=segment_counts.index,
+                    y=segment_counts.values,
+                    color=segment_counts.index,
+                    color_discrete_sequence=['#FFD700', '#FFA500', '#32CD32', '#87CEEB', '#DC143C']
+                )
+                fig_rfie.update_layout(height=350, showlegend=False, xaxis_title="세그먼트", yaxis_title="고객 수")
+                st.plotly_chart(fig_rfie, use_container_width=True)
+            
+            with col2:
+                st.subheader("RFIE 점수 분포")
+                st.caption("고객들의 RFIE 점수가 어떻게 분포하는지")
+                fig_hist = px.histogram(df_rfie, x='RFIE_Score', nbins=15, color_discrete_sequence=['#6C5CE7'])
+                fig_hist.update_layout(height=350, xaxis_title="RFIE 점수", yaxis_title="고객 수")
+                st.plotly_chart(fig_hist, use_container_width=True)
+            
+            st.subheader("RFIE 통계")
+            st.caption("세그먼트별 고객 수 요약")
+            rfie_cols = st.columns(5)
+            rfie_cols[0].metric("🏆 Champion", f"{rfie_summary['Champion_수']}명", help="최우수 고객, 바로 계약 가능")
+            rfie_cols[1].metric("⭐ Loyal", f"{rfie_summary['Loyal_수']}명", help="충성도 높은 고객")
+            rfie_cols[2].metric("🌱 Promising", f"{rfie_summary['Promising_수']}명", help="성장 가능성 있는 고객")
+            rfie_cols[3].metric("💤 At Risk", f"{rfie_summary['AtRisk_수']}명", help="관심 저하된 고객, 리마인드 필요")
+            rfie_cols[4].metric("❌ Lost", f"{rfie_summary['Lost_수']}명", help="이탈 위험 고객")
+        
+        # Tab 3: Alerts
+        with adv_tabs[2]:
+            # 설명 박스 추가
+            with st.expander("ℹ️ 경고 시스템이란?", expanded=False):
+                st.markdown("""
+                **경고 시스템**은 데이터에서 **주의가 필요한 패턴을 자동으로 감지**합니다.
+                
+                **🔍 자동 감지 항목:**
+                - 📉 평균 의향 점수가 5.0점 이하로 낮을 때
+                - 📋 청약 자격 보유율이 30% 미만일 때
+                - 🏠 특정 평형에 50% 이상 쏠릴 때 (재고 리스크)
+                
+                **💡 활용 방법:**
+                - 경고가 뜨면 해당 항목을 즉시 점검하세요
+                - 권장 액션을 참고하여 마케팅 전략을 조정하세요
+                """)
+            
+            st.subheader("⚠️ 주의 사항 및 경고")
+            st.caption("데이터에서 자동으로 감지된 주의 사항")
+            alerts = generate_alerts(df)
+            
+            if alerts:
+                for alert in alerts:
+                    st.warning(alert)
+            else:
+                st.success("✅ 현재 특별한 경고 사항이 없습니다. 모든 지표가 정상 범위입니다.")
+            
+            st.subheader("📋 권장 액션")
+            st.caption("현재 데이터 기반으로 추천하는 즉시 실행 가능한 액션")
+            st.info("💡 A급 고객에게 즉시 1:1 전화 상담을 진행하세요.")
+            if lead_summary['A급_수'] > 0:
+                st.info(f"💡 현재 A급 고객 {lead_summary['A급_수']}명에게 VIP 프로모션을 안내하세요.")
+            if rfie_summary['AtRisk_수'] > 0:
+                st.info(f"💡 At Risk 고객 {rfie_summary['AtRisk_수']}명에게 리마인드 메시지를 발송하세요.")
+    
+    except Exception as e:
+        st.error(f"고급 분석 모듈 로딩 실패: {str(e)}")
+
+    # 6. AI Analyst (Moved to Tab)
+    with main_tabs[5]:
+        st.header("🤖 AI 데이터 심층 분석")
+        st.caption("Google Gemini AI가 현재 필터링된 데이터를 분석하여 마케팅 인사이트를 제안합니다.")
+    
+    # Initialize session state for AI result
+    if 'ai_result' not in st.session_state:
+        st.session_state['ai_result'] = None
+
+    col_ai1, col_ai2 = st.columns([1, 4])
+    
+    with col_ai1:
+        if st.button("🚀 AI 분석 시작", type="primary", use_container_width=True):
+            with st.spinner("AI가 데이터를 분석하고 있습니다... (약 10~20초 소요)"):
+                st.session_state['ai_result'] = generate_ai_insight(df)
+    
+    with col_ai2:
+        if st.session_state['ai_result'] and "⚠️" not in st.session_state['ai_result'] and "❌" not in st.session_state['ai_result']:
+            try:
+                from pdf_report_generator import generate_pdf_report
+                
+                # PDF 생성에 필요한 데이터 준비
+                pdf_data = generate_pdf_report(
+                    df, 
+                    ai_insight=st.session_state['ai_result'],
+                    lead_summary=lead_summary,
+                    rfie_summary=rfie_summary
+                )
+                
+                st.download_button(
+                    label="📥 종합 분석 보고서 다운로드 (PDF)",
+                    data=pdf_data,
+                    file_name=f"사전영업_종합보고서_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            except Exception as e:
+                st.error(f"PDF 생성 중 오류 발생: {e}")
+
+    if st.session_state['ai_result']:
+        if "⚠️" in st.session_state['ai_result'] or "❌" in st.session_state['ai_result']:
+            st.error(st.session_state['ai_result'])
+        else:
+            st.success("분석이 완료되었습니다!")
+            st.markdown("### 📊 분석 결과 리포트")
+            st.markdown(st.session_state['ai_result'])
+            st.markdown("---")
+            st.caption("※ 이 분석 결과는 AI에 의해 생성되었으며, 실제 전략 수립 시 참고용으로 활용하세요.")
 
 else:
     st.error("데이터를 찾을 수 없습니다.")
