@@ -3,7 +3,15 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
-from excel_report_generator import generate_excel_report
+try:
+    from excel_report_generator import generate_excel_report
+except ImportError as e:
+    # 디버깅을 위한 상세 에러 출력
+    st.error(f"라이브러리 로딩 오류 (Excel Report): {e}")
+    generate_excel_report = None
+except Exception as e:
+    st.error(f"알 수 없는 오류 (Excel Report): {e}")
+    generate_excel_report = None
 from ai_analyzer import generate_ai_insight
 
 # Page Config
