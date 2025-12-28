@@ -8,6 +8,10 @@ try:
 except ImportError as e:
     # 디버깅을 위한 상세 에러 출력
     st.error(f"라이브러리 로딩 오류 (Excel Report): {e}")
+    # 디버깅 정보 출력
+    import os
+    st.write(f"Current Directory: {os.getcwd()}")
+    st.write(f"Directory Content: {os.listdir()}")
     generate_excel_report = None
 except Exception as e:
     st.error(f"알 수 없는 오류 (Excel Report): {e}")
@@ -176,6 +180,11 @@ if df is not None:
                 try:
                     # 현재 필터링된 데이터로 보고서 생성
                     report_type = report_type_options[selected_report]
+                    
+                    if generate_excel_report is None:
+                        st.error("엑셀 생성 모듈이 로드되지 않았습니다. 상단 에러 메시지를 확인해주세요.")
+                        st.stop()
+                        
                     excel_file = generate_excel_report(df, report_type)
                     
                     # 세션 상태에 저장 (BytesIO 대신 bytes 바이트 문자열로 저장)
