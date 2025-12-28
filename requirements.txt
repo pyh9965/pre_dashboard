@@ -3,10 +3,7 @@ pandas
 openpyxl
 plotly
 xlsxwriter
-kaleido
+kaleido==0.2.1
 pillow
-zhipuai
-sniffio
-zai-sdk
 google-genai
 reportlab
