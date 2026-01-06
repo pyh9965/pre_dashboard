@@ -394,7 +394,20 @@ class ExcelReportGenerator:
         fig = px.pie(counts, values='Count', names='Answer', title=title, hole=0.4,
                      color_discrete_sequence=px.colors.qualitative.Pastel)
         fig.update_traces(textposition='inside', textinfo='percent+label')
-        fig.update_layout(showlegend=True, height=400)
+        
+        # 한글 폰트 설정
+        fig.update_layout(
+            showlegend=True, 
+            height=400,
+            font=dict(
+                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                size=12
+            ),
+            title_font=dict(
+                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                size=14
+            )
+        )
         
         return fig
     
@@ -407,7 +420,20 @@ class ExcelReportGenerator:
         fig = px.bar(counts, x='Answer', y='Count', title=title, text='Count',
                      color='Answer', color_discrete_sequence=px.colors.qualitative.Pastel)
         fig.update_traces(textposition='outside')
-        fig.update_layout(showlegend=False, height=400)
+        
+        # 한글 폰트 설정
+        fig.update_layout(
+            showlegend=False, 
+            height=400,
+            font=dict(
+                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                size=12
+            ),
+            title_font=dict(
+                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                size=14
+            )
+        )
         
         return fig
     
@@ -421,7 +447,21 @@ class ExcelReportGenerator:
                      color='Count', color_continuous_scale='Blues')
         fig.update_traces(textposition='outside')
         fig.update_xaxes(dtick=1)
-        fig.update_layout(showlegend=False, height=400, coloraxis_showscale=False)
+        
+        # 한글 폰트 설정
+        fig.update_layout(
+            showlegend=False, 
+            height=400, 
+            coloraxis_showscale=False,
+            font=dict(
+                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                size=12
+            ),
+            title_font=dict(
+                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                size=14
+            )
+        )
         
         return fig
 
