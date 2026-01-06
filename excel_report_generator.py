@@ -416,15 +416,21 @@ class ExcelReportGenerator:
         counts = df[column].value_counts().reset_index()
         counts.columns = ['Answer', 'Count']
         
+        # 최대값 계산 (Y축 범위 설정용)
+        max_count = counts['Count'].max() if not counts.empty else 0
+        
         # 항목별 다른 색상 적용
         fig = px.bar(counts, x='Answer', y='Count', title=title, text='Count',
                      color='Answer', color_discrete_sequence=px.colors.qualitative.Pastel)
-        fig.update_traces(textposition='outside')
         
-        # 한글 폰트 설정
+        # 텍스트가 잘리지 않도록 cliponaxis=False 설정
+        fig.update_traces(textposition='outside', cliponaxis=False)
+        
+        # 한글 폰트 설정 및 Y축 범위 조정
         fig.update_layout(
             showlegend=False, 
             height=400,
+            margin=dict(t=50, b=50),  # 상하 여백 추가
             font=dict(
                 family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=12
@@ -432,6 +438,9 @@ class ExcelReportGenerator:
             title_font=dict(
                 family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=14
+            ),
+            yaxis=dict(
+                range=[0, max_count * 1.2]  # Y축 범위를 1.2배로 늘려서 상단 공간 확보
             )
         )
         
@@ -442,17 +451,22 @@ class ExcelReportGenerator:
         q6_counts = df['Q6_Intent'].value_counts().sort_index().reset_index()
         q6_counts.columns = ['Score', 'Count']
         
+        # 최대값 계산
+        max_count = q6_counts['Count'].max() if not q6_counts.empty else 0
+        
         # 점수에 따라 색상 그라데이션 적용 (Blues)
         fig = px.bar(q6_counts, x='Score', y='Count', title='Q6. 계약 의향 점수 분포', text='Count',
                      color='Count', color_continuous_scale='Blues')
-        fig.update_traces(textposition='outside')
+        
+        fig.update_traces(textposition='outside', cliponaxis=False)
         fig.update_xaxes(dtick=1)
         
-        # 한글 폰트 설정
+        # 한글 폰트 설정 및 Y축 범위 조정
         fig.update_layout(
             showlegend=False, 
             height=400, 
             coloraxis_showscale=False,
+            margin=dict(t=50, b=50),  # 상하 여백 추가
             font=dict(
                 family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=12
@@ -460,6 +474,9 @@ class ExcelReportGenerator:
             title_font=dict(
                 family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=14
+            ),
+            yaxis=dict(
+                range=[0, max_count * 1.2]  # Y축 범위를 1.2배로 늘림
             )
         )
         
