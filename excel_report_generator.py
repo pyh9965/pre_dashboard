@@ -400,11 +400,11 @@ class ExcelReportGenerator:
             showlegend=True, 
             height=400,
             font=dict(
-                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=12
             ),
             title_font=dict(
-                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=14
             )
         )
@@ -426,11 +426,11 @@ class ExcelReportGenerator:
             showlegend=False, 
             height=400,
             font=dict(
-                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=12
             ),
             title_font=dict(
-                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=14
             )
         )
@@ -454,11 +454,11 @@ class ExcelReportGenerator:
             height=400, 
             coloraxis_showscale=False,
             font=dict(
-                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=12
             ),
             title_font=dict(
-                family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+                family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
                 size=14
             )
         )
