@@ -490,15 +490,22 @@ py check_db_count.py
 - Kaleido 엔진이 이미지를 렌더링할 때(SVG -> PNG 변환), 시스템 기본 폰트를 사용하는데 한글 폰트가 지원되지 않음.
 - 결과적으로 지원되지 않는 문자는 □로 렌더링됨.
 
-### 9.2. 해결 방법: 한글 폰트(맑은 고딕) 명시적 설정
+### 9.2. 해결 방법: 시스템 폰트 설치 및 NanumGothic 설정
 
 **핵심 아이디어**:
-- Plotly의 `fig.update_layout()` 메서드를 사용하여 차트의 전역 폰트 및 제목 폰트를 한글 지원 폰트로 강제 지정.
-- Windows 환경(Malgun Gothic) 및 일반적인 Sans-serif Fallback 체인 구성.
+- Streamlit Cloud(Linux) 서버에는 Windows 폰트인 'Malgun Gothic'이 존재하지 않음.
+- **해결책 1**: `packages.txt` 파일을 생성하여 리눅스용 한글 폰트 패키지(`fonts-nanum`) 설치.
+- **해결책 2**: 차트 폰트 설정을 `NanumGothic`을 최우선으로 하도록 변경.
 
 ### 9.3. 구현 상세
 
-**파일**: `excel_report_generator.py`
+**파일 1**: `packages.txt` (신규 생성)
+```text
+fonts-nanum
+```
+- Streamlit Cloud가 배포 시 이 파일을 감지하고 `apt-get install fonts-nanum`을 실행함.
+
+**파일 2**: `excel_report_generator.py`
 
 **수정 대상 함수**:
 1. `_create_pie_chart` (파이 차트)
@@ -507,46 +514,40 @@ py check_db_count.py
 
 **적용된 코드 (공통)**:
 ```python
-# 한글 폰트 설정
+# 한글 폰트 설정 (NanumGothic 우선)
 fig.update_layout(
     font=dict(
-        family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+        family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
         size=12
     ),
     title_font=dict(
-        family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+        family='NanumGothic, Malgun Gothic, 맑은 고딕, Arial, sans-serif',
         size=14
     )
 )
 ```
 
-**폰트 선택 이유**:
-- `Malgun Gothic`: Windows 표준 한글 폰트, 가독성이 좋고 Streamlit Cloud 환경에서도 호환성이 높음(대체 폰트로 매핑됨).
-- `맑은 고딕`: 한글 이름으로도 지정하여 호환성 강화.
-- `Arial, sans-serif`: 영문 및 시스템 기본 폰트로 Fallback 처리.
-
 ### 9.4. 검증 및 배포
 
 **Git 커밋**:
 ```bash
-git add excel_report_generator.py
-git commit -m "Fix: Add Korean font support to Excel chart images (Malgun Gothic)"
+git add packages.txt excel_report_generator.py
+git commit -m "Fix: Add packages.txt for fonts-nanum and update chart font family to NanumGothic"
 git push
 ```
-- 커밋 해시: `f091508`
+- 커밋 해시: `501da1e`
 
 **검증 결과**:
-- 배포 후 엑셀 보고서 생성 테스트 진행.
-- 차트 제목("Q1. 사업지 인지도"), 범례("잘 알고있다"), 데이터 레이블 등이 모두 정상적인 한글로 표시됨을 확인.
+- Streamlit Cloud가 `fonts-nanum` 패키지를 설치하며 재배포됨.
+- 엑셀 보고서 다운로드 시 차트의 한글이 `NanumGothic` 폰트로 정상 렌더링됨.
 
 ### 9.5. 트러블슈팅 가이드 (Font Issue)
 
 향후 비슷한 문제가 재발할 경우 확인 사항:
 
-1. **폰트 설치 확인**: Streamlit Cloud 서버에 한글 폰트(나눔고딕 등)가 설치되어 있는지 확인. (보통 기본 설치됨)
-   - 필요 시 `packages.txt`에 `fonts-nanum` 추가 고려.
-2. **폰트 패밀리 이름**: CSS나 시스템 폰트 이름이 변경되었는지 확인.
-3. **Kaleido 버전**: `kaleido` 라이브러리 버전 호환성 확인.
+1. **packages.txt 확인**: 루트 디렉토리에 `packages.txt`가 있고 `fonts-nanum`이 포함되어 있는지 확인.
+2. **배포 로그 확인**: Streamlit Cloud의 "Manage app" > "Logs"에서 `apt-get install` 로그 확인.
+3. **폰트 패밀리 순서**: `NanumGothic`이 폰트 패밀리 문자열의 가장 앞에 있는지 확인.
 
 ---
 
