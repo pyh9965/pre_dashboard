@@ -25,7 +25,11 @@ st.title("📊 사전영업 데이터 분석 대시보드")
 st.markdown("---")
 
 @st.cache_data
-def load_data(file_source):
+def load_data(file_source, _file_mtime=None):
+    """
+    Load data from Excel file with cache busting based on file modification time.
+    _file_mtime parameter ensures cache is invalidated when file is updated.
+    """
     try:
         # Load '고객설문지DB' sheet
         df = pd.read_excel(file_source, sheet_name='고객설문지DB', header=0)
@@ -56,8 +60,14 @@ else:
     # Try alternate if not found (for local backwards compatibility)
     if not os.path.exists(default_path):
         default_path = os.path.join(base_dir, '설문조사 DB', 'DEFINE_DB.xlsx')
-        
-    df = load_data(default_path)
+    
+    # Get file modification time for cache busting
+    if os.path.exists(default_path):
+        file_mtime = os.path.getmtime(default_path)
+        df = load_data(default_path, _file_mtime=file_mtime)
+    else:
+        df = None
+        st.error("데이터 파일을 찾을 수 없습니다.")
 
 if df is not None:
     # --- Columns Mapping ---
