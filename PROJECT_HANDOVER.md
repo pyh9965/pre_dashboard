@@ -477,7 +477,80 @@ py check_db_count.py
 
 ---
 
-## 9. 현재 시스템 상태 (2026-01-06 기준)
+## 9. 엑셀 보고서 차트 한글 폰트 이슈 해결 (2026-01-06 문서화)
+
+### 9.1. 작업 배경
+
+**문제 상황**:
+- 사용자가 다운로드한 엑셀 보고서의 차트 이미지에서 한글이 네모 박스(□□□□)로 표시됨.
+- 차트 제목, 범례, 축 레이블 등 모든 텍스트가 깨져서 식별 불가능.
+
+**근본 원인**:
+- `excel_report_generator.py`에서 Plotly 차트를 생성할 때 폰트 설정을 명시하지 않음.
+- Kaleido 엔진이 이미지를 렌더링할 때(SVG -> PNG 변환), 시스템 기본 폰트를 사용하는데 한글 폰트가 지원되지 않음.
+- 결과적으로 지원되지 않는 문자는 □로 렌더링됨.
+
+### 9.2. 해결 방법: 한글 폰트(맑은 고딕) 명시적 설정
+
+**핵심 아이디어**:
+- Plotly의 `fig.update_layout()` 메서드를 사용하여 차트의 전역 폰트 및 제목 폰트를 한글 지원 폰트로 강제 지정.
+- Windows 환경(Malgun Gothic) 및 일반적인 Sans-serif Fallback 체인 구성.
+
+### 9.3. 구현 상세
+
+**파일**: `excel_report_generator.py`
+
+**수정 대상 함수**:
+1. `_create_pie_chart` (파이 차트)
+2. `_create_bar_chart` (막대 차트)
+3. `_create_intent_chart` (계약 의향 차트)
+
+**적용된 코드 (공통)**:
+```python
+# 한글 폰트 설정
+fig.update_layout(
+    font=dict(
+        family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+        size=12
+    ),
+    title_font=dict(
+        family='Malgun Gothic, 맑은 고딕, Arial, sans-serif',
+        size=14
+    )
+)
+```
+
+**폰트 선택 이유**:
+- `Malgun Gothic`: Windows 표준 한글 폰트, 가독성이 좋고 Streamlit Cloud 환경에서도 호환성이 높음(대체 폰트로 매핑됨).
+- `맑은 고딕`: 한글 이름으로도 지정하여 호환성 강화.
+- `Arial, sans-serif`: 영문 및 시스템 기본 폰트로 Fallback 처리.
+
+### 9.4. 검증 및 배포
+
+**Git 커밋**:
+```bash
+git add excel_report_generator.py
+git commit -m "Fix: Add Korean font support to Excel chart images (Malgun Gothic)"
+git push
+```
+- 커밋 해시: `f091508`
+
+**검증 결과**:
+- 배포 후 엑셀 보고서 생성 테스트 진행.
+- 차트 제목("Q1. 사업지 인지도"), 범례("잘 알고있다"), 데이터 레이블 등이 모두 정상적인 한글로 표시됨을 확인.
+
+### 9.5. 트러블슈팅 가이드 (Font Issue)
+
+향후 비슷한 문제가 재발할 경우 확인 사항:
+
+1. **폰트 설치 확인**: Streamlit Cloud 서버에 한글 폰트(나눔고딕 등)가 설치되어 있는지 확인. (보통 기본 설치됨)
+   - 필요 시 `packages.txt`에 `fonts-nanum` 추가 고려.
+2. **폰트 패밀리 이름**: CSS나 시스템 폰트 이름이 변경되었는지 확인.
+3. **Kaleido 버전**: `kaleido` 라이브러리 버전 호환성 확인.
+
+---
+
+## 10. 현재 시스템 상태 (2026-01-06 기준)
 
 ### 9.1. 데이터 현황
 - **총 레코드 수**: 8,394건
@@ -505,7 +578,7 @@ py check_db_count.py
 
 ---
 
-## 10. 다음 AI 에이전트를 위한 체크리스트
+## 11. 다음 AI 에이전트를 위한 체크리스트
 
 새로운 AI 에이전트가 이 프로젝트를 인수받을 때 확인할 사항:
 
